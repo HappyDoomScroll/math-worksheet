@@ -1577,4 +1577,238 @@
         }
 
         function discussProblemInline(btn) {
-            const containerRoot = btn.closest('.
+            const containerRoot = btn.closest('.ai-problem-container');
+            const input = containerRoot.querySelector('.ai-input');
+            const problem = input.dataset.problem;
+            const userVal = input.textContent.trim();
+            
+            if (!problem) return;
+
+            const chatContainer = containerRoot.querySelector('.inline-problem-chat');
+            const history = chatContainer.querySelector('.chat-history');
+            
+            chatContainer.classList.remove('hidden');
+            chatContainer.classList.add('flex'); 
+            
+            if (history.children.length === 0) {
+                const msg = `I'm working on this calculus practice problem: "${problem}". ${userVal ? 'I thought the answer was "' + userVal + '", but I need help.' : 'Can you help me think through how to start?'}`;
+                appendInlineProblemMessage(history, msg, 'user');
+                triggerInlineProblemAI(history, msg, problem);
+            }
+
+            chatContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            chatContainer.querySelector('.chat-input').focus();
+        }
+
+        function sendInlineProblemChat(triggerElem) {
+            const chatContainer = triggerElem.closest('.inline-problem-chat');
+            const input = chatContainer.querySelector('.chat-input');
+            const history = chatContainer.querySelector('.chat-history');
+            const problemInput = chatContainer.closest('.ai-problem-container').querySelector('.ai-input');
+            
+            const val = input.value.trim();
+            if(!val) return;
+            
+            input.value = "";
+            appendInlineProblemMessage(history, val, 'user');
+            triggerInlineProblemAI(history, val, problemInput.dataset.problem);
+        }
+
+        async function sendDirectMessage(msg, isSocraticContext = false) {
+            const history = document.getElementById('chat-history');
+            
+            const uDiv = document.createElement('div');
+            uDiv.className = "bg-[var(--accent-primary)] font-bold text-white p-3 md:p-4 rounded-[20px] rounded-br-none ml-8 text-right shadow-sm";
+            uDiv.textContent = msg;
+            history.appendChild(uDiv);
+            history.scrollTop = history.scrollHeight;
+
+            const uDivLoading = document.createElement('div');
+            uDivLoading.className = "bg-[#f5f5f7] border border-gray-200 p-3 md:p-4 rounded-[20px] rounded-bl-none mr-8 shadow-sm flex items-center text-slate-600 font-bold";
+            uDivLoading.innerHTML = `<span class="loading-spinner border-gray-400 border-b-transparent w-4 h-4 mr-3"></span> Thinking...`;
+            history.appendChild(uDivLoading);
+            history.scrollTop = history.scrollHeight;
+
+            let system = "You are an expert Math and Calculus tutor. Your goal is to help students THINK through problems using the Socratic method. Be encouraging, supportive, and brief. DO NOT immediately give final answers to problems. Use LaTeX for math." + getMajorContext();
+            
+            if (isSocraticContext) {
+                system += " The student has invoked you specifically from a practice problem or a concept explanation they are struggling with. Heavily prioritize asking guiding, step-by-step questions to help them uncover the answer or understand the concept themselves.";
+            }
+
+            const resp = await callGemini(msg, system);
+
+            history.removeChild(uDivLoading);
+            const aDiv = document.createElement('div');
+            aDiv.className = "bg-[#f5f5f7] border border-gray-200 p-3 md:p-4 rounded-[20px] rounded-bl-none mr-8 shadow-sm text-slate-800 font-bold leading-relaxed";
+            
+            aDiv.innerHTML = formatGeminiResponse(resp);
+            history.appendChild(aDiv);
+            initMath(aDiv);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function triggerSocraticHelpInline(btn) {
+            const wrapper = btn.closest('.input-wrapper');
+            const input = wrapper.querySelector('.input-box');
+            const userVal = input.textContent.trim();
+            const concept = input.dataset.concept || "this concept";
+            
+            toggleChat(true);
+            const msg = `I'm stuck on the concept: "${concept}". I typed "${userVal || "[blank]"}". Can you guide me on how to find the right answer?`;
+            sendDirectMessage(msg, true);
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const val = input.value.trim();
+            if(!val) return;
+            input.value = "";
+            sendDirectMessage(val, false);
+        }
+
+        function formatUserString(str) {
+            return str.toLowerCase().replace(/\s/g, '').replace(/−/g, '-');
+        }
+
+        function setupInputListeners() {
+            const appRoot = document.getElementById('interactive-worksheet-app');
+            if(!appRoot) return;
+
+            appRoot.querySelectorAll('.input-box:not(.ai-input)').forEach(box => {
+                box.addEventListener('keydown', e => { 
+                    if(e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        box.blur(); 
+                    } 
+                });
+
+                box.addEventListener('blur', () => {
+                    const userVal = formatUserString(box.textContent);
+                    const ansVal = formatUserString(box.dataset.answer);
+                    const wrapper = box.closest('.input-wrapper');
+                    const helpBtn = wrapper.querySelector('.inline-help-btn');
+                    
+                    if (userVal === "") {
+                        box.classList.remove('correct', 'incorrect');
+                        if(helpBtn) helpBtn.style.display = 'none';
+                        updateProgress();
+                        return;
+                    }
+
+                    const isCorrect = userVal === ansVal || userVal.includes(ansVal) || ansVal.includes(userVal);
+                    box.classList.toggle('correct', isCorrect);
+                    box.classList.toggle('incorrect', !isCorrect);
+                    
+                    if (!isCorrect && helpBtn) {
+                        helpBtn.style.display = 'block';
+                    } else if (helpBtn) {
+                        helpBtn.style.display = 'none';
+                    }
+                    updateProgress();
+                });
+            });
+        }
+
+        function updateProgress() {
+            const appRoot = document.getElementById('interactive-worksheet-app');
+            const boxes = appRoot.querySelectorAll('.input-box:not(.ai-input)');
+            const correct = Array.from(boxes).filter(b => b.classList.contains('correct')).length;
+            const pct = Math.round((correct / boxes.length) * 100);
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = pct + '%';
+        }
+
+        function checkAiAnswer(btn) {
+            if(!btn) return;
+            const containerRoot = btn.closest('.ai-problem-container');
+            if(!containerRoot) return;
+            
+            const input = containerRoot.querySelector('.ai-input');
+            const feedback = containerRoot.querySelector('.ai-feedback');
+            
+            if(!input || !feedback) return;
+            
+            const userVal = formatUserString(input.textContent);
+            const ansVal = formatUserString(input.dataset.answer);
+            
+            if (userVal === "") return;
+
+            const isCorrect = userVal === ansVal || userVal.includes(ansVal) || ansVal.includes(userVal);
+            
+            input.classList.toggle('correct', isCorrect);
+            input.classList.toggle('incorrect', !isCorrect);
+            
+            feedback.style.display = 'block';
+            if (isCorrect) {
+                feedback.innerHTML = `<span class="text-[#248a3d] font-extrabold">✓ Correct!</span> Great job applying the rules.`;
+                feedback.className = "ai-feedback mt-6 text-sm md:text-base bg-[#f0fdf4] text-[#248a3d] p-4 rounded-2xl border border-[#16a34a] font-semibold";
+            } else {
+                feedback.innerHTML = `Not quite! Try clicking <strong>Tutor</strong> to get some guidance.`;
+                feedback.className = "ai-feedback mt-6 text-sm md:text-base bg-[#fff5f5] text-[#c92a20] p-4 rounded-2xl border border-[#dc2626] font-semibold";
+            }
+        }
+
+        function toggleChat(forceOpen = false) { 
+            const chatWindow = document.getElementById('ai-chat-window');
+            if (forceOpen === true) chatWindow.classList.remove('hidden');
+            else chatWindow.classList.toggle('hidden'); 
+        }
+        
+        function closeModal() { 
+            document.getElementById('ai-modal').classList.add('hidden'); 
+            document.getElementById('inline-chat-section').classList.add('hidden');
+            document.getElementById('inline-chat-section').classList.remove('flex');
+            document.getElementById('inline-chat-history').innerHTML = '';
+        }
+
+        // --- Interactive Graph ---
+        function drawTangentGraph() {
+            const canvas = document.getElementById('tangentCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const slider = document.getElementById('aSlider');
+            const slopeDisplay = document.getElementById('slopeDisplay');
+
+            function f(x) { return Math.pow(x, 3) - 2 * x; }
+            function df(x) { return 3 * Math.pow(x, 2) - 2; }
+
+            function render() {
+                const a = parseFloat(slider.value);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const scaleX = 80; const scaleY = 30;
+                const centerX = canvas.width / 2; const centerY = canvas.height / 2;
+                const toX = (val) => centerX + val * scaleX;
+                const toY = (val) => centerY - val * scaleY;
+
+                ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0, centerY); ctx.lineTo(canvas.width, centerY); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(centerX, 0); ctx.lineTo(centerX, canvas.height); ctx.stroke();
+
+                ctx.strokeStyle = '#52525b'; ctx.lineWidth = 3;
+                ctx.lineCap = "round"; ctx.lineJoin = "round";
+                ctx.beginPath();
+                for (let x = -3; x <= 3; x += 0.05) {
+                    if (x === -3) ctx.moveTo(toX(x), toY(f(x))); else ctx.lineTo(toX(x), toY(f(x)));
+                }
+                ctx.stroke();
+
+                const fa = f(a); const slope = df(a);
+                ctx.strokeStyle = '#8C1D40'; ctx.lineWidth = 2.5; 
+                const len = 2;
+                ctx.beginPath();
+                ctx.moveTo(toX(a - len), toY(fa - slope * len));
+                ctx.lineTo(toX(a + len), toY(fa + slope * len));
+                ctx.stroke();
+
+                ctx.fillStyle = '#FFC627';
+                ctx.beginPath(); ctx.arc(toX(a), toY(fa), 6, 0, Math.PI * 2); ctx.fill(); 
+                ctx.strokeStyle = '#8C1D40'; ctx.lineWidth = 2; ctx.stroke();
+
+                slopeDisplay.innerHTML = `At $x = ${a.toFixed(1)}$, the slope $f'(${a.toFixed(1)}) = ${slope.toFixed(2)}$`;
+                if (typeof renderMathInElement === 'function') renderMathInElement(slopeDisplay, {delimiters: [{left: '$', right: '$', display: false}]});
+            }
+            slider.addEventListener('input', render);
+            render();
+        }
+    </script>
+</div>
