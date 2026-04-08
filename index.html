@@ -1,0 +1,1782 @@
+<!-- WordPress Interactive Worksheet Container -->
+<!-- Paste this entirely inside a Custom HTML block -->
+
+<!-- 1. Load Tailwind and KaTeX Scripts -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    // CRUCIAL FOR WORDPRESS: Disable preflight to prevent Tailwind from breaking your WP theme's header/footer
+    tailwind.config = {
+        corePlugins: {
+            preflight: false,
+        }
+    }
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<!-- 2. Scoped CSS for the Worksheet -->
+<style>
+    /* CRITICAL RESPONSIVE RESET: Replaces what we lost by turning off Tailwind Preflight */
+    #interactive-worksheet-app,
+    #interactive-worksheet-app *,
+    #interactive-worksheet-app *::before,
+    #interactive-worksheet-app *::after {
+        box-sizing: border-box;
+    }
+    
+    #interactive-worksheet-app img,
+    #interactive-worksheet-app video,
+    #interactive-worksheet-app canvas,
+    #interactive-worksheet-app svg {
+        display: block;
+        max-width: 100%;
+        height: auto;
+    }
+
+    #interactive-worksheet-app {
+        --accent-primary: #8C1D40; /* ASU Maroon */
+        --accent-secondary: #FFC627; /* ASU Gold */
+        --bg-main: #f5f5f7;
+        --text-dark: #1d1d1f;
+        --apple-dark: #1c1c1e;
+        --apple-border: rgba(0, 0, 0, 0.15);
+        --card-shadow: 0 10px 40px -10px rgba(0,0,0,0.08);
+        
+        background-color: var(--bg-main);
+        color: var(--text-dark);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+        font-size: 17px; 
+        -webkit-font-smoothing: antialiased;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        width: 100%;
+    }
+    
+    /* Reset some basic elements inside the app since preflight is off */
+    #interactive-worksheet-app h1, 
+    #interactive-worksheet-app h2, 
+    #interactive-worksheet-app h3,
+    #interactive-worksheet-app h4 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+    #interactive-worksheet-app p { margin-top: 0; margin-bottom: 1rem; }
+    #interactive-worksheet-app ul { padding-left: 1.5rem; margin-bottom: 1rem; }
+    
+    #interactive-worksheet-app .lesson-card {
+        background: #ffffff;
+        border-radius: 32px; 
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--apple-border);
+        padding: 1.5rem; /* Reduced for mobile */
+        margin-bottom: 2rem; /* Reduced for mobile */
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        width: 100%;
+    }
+    @media (min-width: 768px) {
+        #interactive-worksheet-app .lesson-card { 
+            padding: 3rem; 
+            margin-bottom: 3rem;
+        }
+    }
+
+    #interactive-worksheet-app .input-wrapper {
+        display: inline-flex;
+        flex-direction: column;
+        position: relative;
+        margin: 0 4px;
+        vertical-align: middle;
+    }
+    #interactive-worksheet-app .input-box {
+        border: 1px solid #94a3b8;
+        color: var(--accent-primary);
+        font-weight: 700;
+        padding: 6px 20px;
+        min-width: 110px;
+        display: inline-block;
+        outline: none;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        background-color: #fbfbfd;
+        border-radius: 999px;
+        text-align: center;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
+        font-family: 'SF Mono', ui-monospace, 'Courier New', monospace;
+        font-size: 1.05rem;
+    }
+    #interactive-worksheet-app .input-box:empty::before {
+        content: "type here";
+        color: #52525b;
+        font-style: italic;
+        font-weight: 500;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    #interactive-worksheet-app .input-box:hover {
+        background-color: #ffffff;
+        border-color: var(--accent-primary);
+    }
+    #interactive-worksheet-app .input-box:focus {
+        border-color: var(--accent-primary);
+        background-color: #ffffff;
+        box-shadow: 0 0 0 4px rgba(140, 29, 64, 0.15), inset 0 2px 5px rgba(0,0,0,0.01);
+    }
+    #interactive-worksheet-app .correct {
+        background-color: #f0fdf4 !important;
+        border-color: #16a34a !important;
+        color: #15803d !important;
+    }
+    #interactive-worksheet-app .incorrect {
+        background-color: #fef2f2 !important;
+        border-color: #dc2626 !important;
+        color: #b91c1c !important;
+    }
+    
+    #interactive-worksheet-app .inline-help-btn {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.75rem;
+        font-weight: 700;
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--accent-primary); 
+        color: var(--accent-primary);
+        border-radius: 99px;
+        padding: 4px 16px;
+        white-space: nowrap;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10;
+        display: none; 
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #interactive-worksheet-app .inline-help-btn:hover, 
+    #interactive-worksheet-app .inline-help-btn:focus { 
+        background: var(--accent-primary); 
+        color: white;
+        transform: translateX(-50%) translateY(-2px); 
+        outline: none; 
+        box-shadow: 0 6px 16px rgba(140, 29, 64, 0.25);
+    }
+
+    #interactive-worksheet-app .btn-ai {
+        background: #ffffff;
+        border: 1px solid #94a3b8;
+        color: var(--text-dark);
+        padding: 8px 24px;
+        border-radius: 999px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        cursor: pointer;
+        width: 100%;
+    }
+    @media (min-width: 768px) {
+        #interactive-worksheet-app .btn-ai { width: auto; }
+    }
+    #interactive-worksheet-app .btn-ai:hover, 
+    #interactive-worksheet-app .btn-ai:focus {
+        background: white;
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+        box-shadow: 0 4px 12px rgba(140, 29, 64, 0.15);
+        transform: translateY(-1px);
+        outline: none;
+    }
+    
+    #interactive-worksheet-app .section-badge {
+        background: var(--accent-primary);
+        color: #ffffff;
+        font-weight: 800;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        margin-right: 14px;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(140, 29, 64, 0.25);
+    }
+    #interactive-worksheet-app .section-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        color: var(--text-dark);
+        letter-spacing: -0.03em;
+    }
+    @media (min-width: 768px) {
+        #interactive-worksheet-app .section-title { font-size: 1.8rem; }
+    }
+
+    #interactive-worksheet-app .practice-area {
+        background: var(--apple-dark); 
+        color: #f5f5f7;
+        border-radius: 28px;
+        padding: 1.5rem;
+        margin-top: 3rem;
+        box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 10px 30px rgba(0,0,0,0.2);
+        border: 1px solid rgba(255,255,255,0.1);
+        width: 100%;
+    }
+    @media (min-width: 768px) {
+        #interactive-worksheet-app .practice-area { padding: 3rem; }
+    }
+    #interactive-worksheet-app .practice-area .input-box { 
+        background: rgba(255,255,255,0.1); 
+        border: 1px solid rgba(255,255,255,0.4); 
+        color: #ffffff; 
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+    #interactive-worksheet-app .practice-area .input-box:focus { 
+        background: rgba(255,255,255,0.15); 
+        border-color: var(--accent-secondary); 
+        box-shadow: 0 0 0 4px rgba(255, 198, 39, 0.3), inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+    #interactive-worksheet-app .practice-area .input-box:empty::before { color: rgba(255,255,255,0.7); }
+
+    #interactive-worksheet-app .btn-gold {
+        background-color: var(--accent-secondary);
+        color: #000000;
+        border: none;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        width: 100%;
+        justify-content: center;
+        border-radius: 999px;
+        box-shadow: 0 4px 15px rgba(255, 198, 39, 0.3);
+    }
+    @media (min-width: 768px) {
+        #interactive-worksheet-app .btn-gold { width: auto; justify-content: flex-start; }
+    }
+    #interactive-worksheet-app .btn-gold:hover, 
+    #interactive-worksheet-app .btn-gold:focus {
+        background-color: #ffd040;
+        transform: scale(1.03) translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 198, 39, 0.5);
+        outline: none;
+    }
+
+    #interactive-worksheet-app .loading-spinner {
+        width: 18px; height: 18px; border: 3px solid currentColor; border-bottom-color: transparent;
+        border-radius: 50%; display: inline-block; animation: rotation 1s linear infinite;
+    }
+    @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes progress-play { 0% { width: 0%; } 100% { width: 100%; } }
+    
+    /* Sticky Sidebar Configuration */
+    #interactive-worksheet-app .sticky-panel {
+        position: relative; /* Default for mobile */
+        height: auto; 
+        z-index: 40;
+        align-self: flex-start; /* CRITICAL: Allows sidebar to stick while scrolling the flex container */
+    }
+    @media (min-width: 1024px) {
+        #interactive-worksheet-app .sticky-panel {
+            position: -webkit-sticky;
+            position: sticky;
+            top: 2rem; /* Offset to prevent overlap with WP fixed headers */
+            max-height: calc(100vh - 2rem); 
+        }
+    }
+
+    #interactive-worksheet-app .glass-panel {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    /* Video Block Overrides for Interaction */
+    #interactive-worksheet-app .video-state-inline.pointer-events-none *,
+    #interactive-worksheet-app .video-state-pinned.pointer-events-none *,
+    #interactive-worksheet-app .video-state-default.pointer-events-none * {
+        pointer-events: none;
+    }
+</style>
+
+<!-- 3. Main HTML Content -->
+<div id="interactive-worksheet-app">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 w-full">
+        
+        <!-- HEADER -->
+        <header class="mb-12 w-full text-center md:text-left">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tighter mb-4">Interactive Worksheet</h1>
+            <p class="text-lg md:text-xl text-[var(--accent-primary)] font-bold tracking-tight">Differentiation Notation, Rules & Applications</p>
+        </header>
+
+        <!-- ACCESSIBLE INSTRUCTIONS -->
+        <div id="how-to-use-banner" role="region" class="glass-panel p-5 md:p-6 rounded-3xl shadow-lg mb-12 flex items-start gap-5 relative transition-all duration-500 transform">
+            <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-[var(--accent-primary)] shrink-0 hidden sm:flex shadow-inner border border-indigo-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div class="flex-1 pr-10">
+                <h2 class="text-lg font-bold text-slate-900 mb-1 tracking-tight">How to use this guide</h2>
+                <p class="text-sm md:text-base text-slate-700 leading-relaxed font-medium">Click the video in each section to begin playing. You can watch it expanded inline, or <strong>pin it to the sidebar</strong> to watch while you scroll. Click the <span class="inline-block bg-white border border-gray-400 rounded-full px-3 py-0.5 mx-1 text-xs text-gray-700 italic shadow-sm font-semibold">type here</span> boxes to fill in the missing math concepts and press <strong>Enter</strong>. If you get stuck, click <strong class="text-[var(--accent-primary)] font-bold">Ask AI</strong>!</p>
+            </div>
+            <button onclick="dismissInstructions()" class="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]" aria-label="Dismiss Instructions">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- 2-COLUMN LAYOUT -->
+        <div class="flex flex-col lg:flex-row gap-8 items-start relative w-full">
+            
+            <!-- SIDEBAR -->
+            <aside class="w-full lg:w-1/3 xl:w-1/4 sticky-panel space-y-6 flex-shrink-0 order-2 lg:order-1">
+                
+                <!-- SIDEBAR VIDEO PLAYER -->
+                <div id="sidebar-video-player" class="hidden bg-slate-900 p-4 md:p-5 rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.2)] border border-slate-800 relative group overflow-hidden transition-all duration-500 w-full">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-red-500 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Pinned Video</span>
+                        <div class="flex gap-2">
+                            <button onclick="expandFromSidebar(event)" class="text-gray-400 hover:text-white transition focus:outline-none bg-white/10 hover:bg-white/20 rounded-full p-1.5" aria-label="Expand to Inline" title="Expand to main content">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                            </button>
+                            <button onclick="closeSidebarVideo()" class="text-gray-400 hover:text-white transition focus:outline-none bg-white/10 hover:bg-white/20 rounded-full p-1.5" aria-label="Close Video" title="Close Video">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="sidebar-video-box" class="aspect-video bg-black rounded-xl mb-4 relative overflow-hidden flex items-center justify-center border border-slate-700 shadow-inner w-full">
+                        <svg class="w-10 h-10 text-white/30 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                            <div class="h-full bg-[var(--accent-primary)] animate-[progress-play_30s_linear_infinite]"></div>
+                        </div>
+                    </div>
+                    <h3 id="sidebar-video-title" class="text-sm md:text-base font-bold text-white tracking-tight leading-tight m-0">Video Title</h3>
+                    <p id="sidebar-video-time" class="text-xs font-semibold text-gray-400 mt-1.5 m-0">Lecture Video • 00:00</p>
+                </div>
+
+                <!-- Progress Panel -->
+                <div class="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-200 w-full">
+                    <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+                        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-600 m-0">Module Progress</h2>
+                        <div class="w-8 h-8 rounded-full bg-green-100 border border-green-200 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-green-700" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-end mb-4">
+                        <span class="text-sm text-slate-700 font-bold tracking-wide">Completion</span>
+                        <span id="progress-text" class="text-4xl font-extrabold text-slate-900 tracking-tighter leading-none">0%</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                        <div id="progress-bar" class="h-full bg-[var(--accent-primary)] transition-all duration-1000" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Personalization Panel -->
+                <div class="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-200 w-full">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        </div>
+                        <h2 class="text-xs font-bold text-slate-600 uppercase tracking-widest m-0">Industry Context</h2>
+                    </div>
+                    <p class="text-sm text-slate-700 mb-5 leading-relaxed font-medium">Select an industry to tailor your AI word problems and examples.</p>
+                    <div class="relative">
+                        <select id="major-selector" class="w-full appearance-none bg-[#f5f5f7] border border-gray-300 text-slate-900 font-bold rounded-2xl px-5 py-3.5 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/20 transition cursor-pointer text-sm shadow-sm">
+                            <option value="General Tech">General Tech</option>
+                            <option value="Business & Economics">Business & Economics</option>
+                            <option value="Engineering">Engineering</option>
+                            <option value="Biological Sciences">Biological Sciences</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Physics & Astronomy">Physics & Astronomy</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+            </aside>
+
+            <!-- MAIN CONTENT AREA -->
+            <main class="flex-1 w-full min-w-0 order-1 lg:order-2 space-y-10">
+                
+                <!-- SECTION 1: Foundations -->
+                <section class="lesson-card" id="section-1">
+                    <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 pb-2 border-b border-gray-100">
+                        <h2 class="section-title flex items-center m-0">
+                            <span class="section-badge">1</span> Foundations
+                        </h2>
+                        <button onclick="aiExplain('Calculus foundations and instantaneous rate of change', this)" class="btn-ai">
+                            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Concept Breakdown
+                        </button>
+                    </div>
+
+                    <!-- Interactive Video Block -->
+                    <div class="video-block w-full bg-[#1c1c1e] rounded-[24px] aspect-[16/9] md:aspect-[21/9] flex flex-col items-center justify-center text-white mb-10 shadow-lg relative overflow-hidden group border-2 border-transparent hover:border-gray-600 transition-all" data-title="Foundations & Notation" data-time="08:24">
+                        
+                        <!-- Default State -->
+                        <div class="video-state-default absolute inset-0 flex flex-col items-center justify-center z-20 cursor-pointer transition-opacity duration-300" onclick="playVideoInline(this.closest('.video-block'))">
+                            <div class="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-all duration-500 z-10 text-white shadow-lg">
+                                <svg class="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <div class="absolute bottom-6 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Foundations & Notation</p>
+                                <p class="text-xs font-bold tracking-wider uppercase text-gray-300 mt-1 m-0">Click to Play Expanded</p>
+                            </div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 z-0"></div>
+                        </div>
+                        
+                        <!-- Playing Inline State -->
+                        <div class="video-state-inline opacity-0 pointer-events-none absolute inset-0 bg-black z-30 flex flex-col items-center justify-center transition-opacity duration-300">
+                            <svg class="w-12 h-12 text-white/30 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <div class="absolute top-4 right-4 flex gap-2 z-40">
+                                <button onclick="pinToSidebar(event, this.closest('.video-block'))" class="bg-black/50 hover:bg-black/80 text-white rounded-full py-2 px-4 backdrop-blur-md transition flex items-center gap-2 text-sm font-bold border border-white/10 pointer-events-auto" title="Pin to Sidebar to take notes">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                                    Pin to Sidebar
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Playing: Foundations & Notation</p>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                                <div class="h-full bg-[var(--accent-primary)] animate-[progress-play_30s_linear_infinite]"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pinned State -->
+                        <div class="video-state-pinned opacity-0 pointer-events-none absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-30 backdrop-blur-sm transition-opacity duration-300">
+                            <div class="w-12 h-12 bg-[var(--accent-primary)] rounded-full flex items-center justify-center text-white mb-3 shadow-[0_0_15px_var(--accent-primary)] animate-pulse">
+                                <svg class="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <p class="font-bold text-white text-lg m-0">Playing in Sidebar</p>
+                            <p class="text-sm text-gray-400 mt-1 m-0">Scroll down to take notes</p>
+                            <button onclick="expandFromSidebar(event)" class="mt-4 bg-white/10 hover:bg-white/20 text-white rounded-full px-4 py-2 font-bold text-sm backdrop-blur-md transition border border-white/10 pointer-events-auto flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                Expand Video
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6 text-[17px] text-gray-800 font-medium">
+                        <p>Calculus focuses on two main ideas: <strong>differentiation</strong> and <strong>integration</strong>. Differentiation tells us how a function changes at each point. Integration does the opposite—it tells us how those changes add up or accumulate.</p>
+                        
+                        <h3 class="font-extrabold text-xl mt-10 text-slate-900 tracking-tight">Derivative Notation</h3>
+                        <p class="flex flex-wrap items-center gap-y-3">Finding a derivative is called 
+                            <span class="input-wrapper">
+                                <span contenteditable="true" class="input-box" data-answer="differentiation" data-concept="what we call the process of finding a derivative"></span>
+                                <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                            </span>.
+                        </p>
+                        
+                        <p>If $y = f(x)$ is a function whose derivative exists, the first derivative can be written in different notations:</p>
+                        
+                        <div class="bg-[#f5f5f7] p-6 md:p-8 rounded-[24px] border border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-8 my-8 w-full">
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-600 uppercase tracking-widest mb-3 m-0">Prime Notation</h4>
+                                <div class="text-xl flex items-center overflow-x-auto pb-2 font-semibold">
+                                    $y' =$ 
+                                    <span class="input-wrapper">
+                                        <span contenteditable="true" class="input-box" data-answer="f'(x)" data-concept="prime notation for the derivative of f(x)"></span>
+                                        <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-600 uppercase tracking-widest mb-3 m-0">Differential Notation</h4>
+                                <div class="text-xl flex items-center flex-wrap gap-y-3 overflow-x-auto pb-2 font-semibold">
+                                    $y' =$ 
+                                    <span class="input-wrapper">
+                                        <span contenteditable="true" class="input-box" data-answer="dy/dx" data-concept="differential notation representing change in y over change in x"></span>
+                                        <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                    </span> 
+                                    $= \frac{d}{dx}f(x)$
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="leading-loose">For a function $f$, the first derivative of $f$ at $x = a$, denoted by $f'(a)$, represents the 
+                            <span class="input-wrapper">
+                                <span contenteditable="true" class="input-box" data-answer="instantaneous" data-concept="the type of rate of change a derivative represents"></span>
+                                <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                            </span> 
+                            rate of change of $f$ at that specific value.
+                        </p>
+                        
+                        <p class="leading-loose">Graphically, $f'(a)$ is the 
+                            <span class="input-wrapper">
+                                <span contenteditable="true" class="input-box" data-answer="slope" data-concept="the graphical meaning of a derivative"></span>
+                                <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                            </span> 
+                            of the 
+                            <span class="input-wrapper">
+                                <span contenteditable="true" class="input-box" data-answer="tangent line" data-concept="the line that touches a curve at one point"></span>
+                                <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                            </span> 
+                            to the graph of $f$ at the point $(a, f(a))$.
+                        </p>
+
+                        <!-- Interactive Canvas Visualizer -->
+                        <div class="bg-[#fcfcfd] rounded-[24px] p-6 md:p-10 border border-gray-200 mt-12 shadow-sm text-center w-full">
+                            <div class="flex flex-col items-center justify-center mb-8">
+                                <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center mb-3 border border-orange-200">
+                                    <svg class="w-5 h-5 text-orange-700" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12"></path></svg>
+                                </div>
+                                <h3 class="text-sm font-extrabold uppercase tracking-widest text-slate-800 m-0">Interactive Tool: Tangent Explorer</h3>
+                            </div>
+                            
+                            <div class="w-full overflow-hidden flex justify-center">
+                                <canvas id="tangentCanvas" width="600" height="250" class="w-full max-w-full h-auto bg-white rounded-2xl border border-gray-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]"></canvas>
+                            </div>
+                            
+                            <div class="mt-8 flex flex-col items-center w-full">
+                                <input type="range" id="aSlider" min="-2.5" max="2.5" step="0.1" value="0.5" class="w-full max-w-md cursor-pointer h-2 bg-gray-300 rounded-full appearance-none focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/30">
+                                <div id="slopeDisplay" class="font-bold text-slate-900 text-lg mt-6 bg-white py-3 px-6 rounded-full inline-block border border-gray-300 shadow-sm max-w-full overflow-x-auto"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MINI CHALLENGE 1 -->
+                    <div class="practice-area">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6 border-b border-white/20 pb-6 w-full">
+                            <div>
+                                <h3 class="font-extrabold text-2xl text-white tracking-tight m-0">Knowledge Check</h3>
+                                <p class="text-sm text-gray-300 mt-1 font-medium m-0">Test your understanding of concepts.</p>
+                            </div>
+                            <button onclick="generateProblem(this, 'foundations')" class="btn-gold px-6 py-3 font-bold flex items-center gap-3">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                Generate AI Question
+                            </button>
+                        </div>
+                        
+                        <div class="ai-problem-container hidden bg-white/5 p-6 md:p-8 rounded-3xl border border-white/20 mt-4 backdrop-blur-md w-full">
+                            <div class="ai-problem-text text-lg md:text-xl mb-8 text-white font-bold leading-relaxed overflow-x-auto pb-2"></div>
+                            <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/10 shadow-inner w-full">
+                                <label class="font-bold text-gray-200 text-sm uppercase tracking-wider pl-2 shrink-0">Answer</label>
+                                <span class="input-wrapper w-full sm:w-auto flex-1">
+                                    <span contenteditable="true" class="ai-input input-box w-full sm:min-w-[200px] text-lg !border-gray-500 !bg-white/10 !text-white focus:!bg-white/20" data-answer="" data-problem=""></span>
+                                </span>
+                                <div class="flex gap-3 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
+                                    <button onclick="checkAiAnswer(this)" class="flex-1 sm:flex-none bg-white/10 text-white hover:bg-white/20 px-6 py-2.5 rounded-full font-bold border border-white/20">Check</button>
+                                    <button onclick="discussProblemInline(this)" class="flex-1 sm:flex-none bg-[var(--accent-primary)] text-white px-5 py-2.5 rounded-full font-bold hover:opacity-90 shadow-lg">Tutor</button>
+                                </div>
+                            </div>
+                            <div class="ai-feedback mt-6 text-sm font-bold bg-black/40 p-4 rounded-xl hidden border border-white/10"></div>
+                            
+                            <!-- INLINE PROBLEM CHAT -->
+                            <div class="inline-problem-chat hidden mt-8 bg-black/30 rounded-[24px] border border-white/10 overflow-hidden flex-col shadow-inner w-full">
+                                <div class="chat-history p-5 md:p-6 space-y-5 max-h-[300px] overflow-y-auto text-[15px] text-gray-200 scroll-smooth"></div>
+                                <div class="p-4 md:p-5 bg-black/40 border-t border-white/5 flex gap-3 items-center w-full">
+                                    <input type="text" placeholder="Ask a question..." class="chat-input flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-[15px] text-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] min-w-0" onkeydown="if(event.key === 'Enter') sendInlineProblemChat(this)">
+                                    <button onclick="sendInlineProblemChat(this)" class="bg-[var(--accent-primary)] text-white w-12 h-12 rounded-full flex items-center justify-center font-bold hover:opacity-90 shrink-0">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 2: Basic Rules -->
+                <section class="lesson-card" id="section-2">
+                    <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 pb-2 border-b border-gray-100">
+                        <h2 class="section-title m-0 flex items-center">
+                            <span class="section-badge">2</span> Basic Rules
+                        </h2>
+                        <button onclick="aiExplain('Why the basic differentiation rules like the power rule work', this)" class="btn-ai">
+                            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Concept Breakdown
+                        </button>
+                    </div>
+                    
+                    <!-- Interactive Video Block -->
+                    <div class="video-block w-full bg-[#1c1c1e] rounded-[24px] aspect-[16/9] md:aspect-[21/9] flex flex-col items-center justify-center text-white mb-10 shadow-lg relative overflow-hidden group border-2 border-transparent hover:border-gray-600 transition-all" data-title="Building Blocks & Basic Rules" data-time="12:15">
+                        
+                        <div class="video-state-default absolute inset-0 flex flex-col items-center justify-center z-20 cursor-pointer transition-opacity duration-300" onclick="playVideoInline(this.closest('.video-block'))">
+                            <div class="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-all duration-500 z-10 text-white shadow-lg">
+                                <svg class="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <div class="absolute bottom-6 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Building Blocks & Basic Rules</p>
+                                <p class="text-xs font-bold tracking-wider uppercase text-gray-300 mt-1 m-0">Click to Play Expanded</p>
+                            </div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 z-0"></div>
+                        </div>
+                        
+                        <div class="video-state-inline opacity-0 pointer-events-none absolute inset-0 bg-black z-30 flex flex-col items-center justify-center transition-opacity duration-300">
+                            <svg class="w-12 h-12 text-white/30 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <div class="absolute top-4 right-4 flex gap-2 z-40">
+                                <button onclick="pinToSidebar(event, this.closest('.video-block'))" class="bg-black/50 hover:bg-black/80 text-white rounded-full py-2 px-4 backdrop-blur-md transition flex items-center gap-2 text-sm font-bold border border-white/10 pointer-events-auto" title="Pin to Sidebar to take notes">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                                    Pin to Sidebar
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Playing: Building Blocks & Basic Rules</p>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                                <div class="h-full bg-[var(--accent-primary)] animate-[progress-play_30s_linear_infinite]"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-state-pinned opacity-0 pointer-events-none absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-30 backdrop-blur-sm transition-opacity duration-300">
+                            <div class="w-12 h-12 bg-[var(--accent-primary)] rounded-full flex items-center justify-center text-white mb-3 shadow-[0_0_15px_var(--accent-primary)] animate-pulse">
+                                <svg class="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <p class="font-bold text-white text-lg m-0">Playing in Sidebar</p>
+                            <p class="text-sm text-gray-400 mt-1 m-0">Scroll down to take notes</p>
+                            <button onclick="expandFromSidebar(event)" class="mt-4 bg-white/10 hover:bg-white/20 text-white rounded-full px-4 py-2 font-bold text-sm backdrop-blur-md transition border border-white/10 pointer-events-auto flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                Expand Video
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-gray-800 font-medium mb-8">Memorizing these basic derivatives is crucial for everything else in calculus. Fill in the resulting derivative $f'(x)$ for each base function.</p>
+
+                    <!-- Table -->
+                    <div class="border border-gray-300 rounded-[24px] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] w-full">
+                        <div class="overflow-x-auto w-full">
+                            <table class="w-full text-left bg-white min-w-[500px]">
+                                <thead class="bg-[#f0f0f4] text-slate-700 font-extrabold text-xs uppercase tracking-widest border-b border-gray-300">
+                                    <tr>
+                                        <th class="p-5 w-1/3">Rule Name</th>
+                                        <th class="p-5 w-1/3 border-l border-gray-200">Function $f(x)$</th>
+                                        <th class="p-5 w-1/3 border-l border-gray-200">Derivative $f'(x)$</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 text-[17px] font-semibold text-slate-800">
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-5">Constant</td>
+                                        <td class="p-5 border-l border-gray-200 bg-gray-50/80">$c$</td>
+                                        <td class="p-5 border-l border-gray-200">
+                                            <span class="input-wrapper"><span contenteditable="true" class="input-box" data-answer="0" data-concept="derivative of a constant"></span><button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Help</button></span>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-5">Power</td>
+                                        <td class="p-5 border-l border-gray-200 bg-gray-50/80">$x^n$</td>
+                                        <td class="p-5 border-l border-gray-200">
+                                            <span class="input-wrapper"><span contenteditable="true" class="input-box" data-answer="nx^{n-1}" data-concept="power rule for derivatives"></span><button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Help</button></span>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-5">Identity</td>
+                                        <td class="p-5 border-l border-gray-200 bg-gray-50/80">$x$</td>
+                                        <td class="p-5 border-l border-gray-200">
+                                            <span class="input-wrapper"><span contenteditable="true" class="input-box" data-answer="1" data-concept="derivative of x"></span><button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Help</button></span>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-5">Exponential</td>
+                                        <td class="p-5 border-l border-gray-200 bg-gray-50/80">$e^x$</td>
+                                        <td class="p-5 border-l border-gray-200">
+                                            <span class="input-wrapper"><span contenteditable="true" class="input-box" data-answer="e^x" data-concept="derivative of e^x"></span><button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Help</button></span>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-5">Natural Log</td>
+                                        <td class="p-5 border-l border-gray-200 bg-gray-50/80">$\ln(x)$</td>
+                                        <td class="p-5 border-l border-gray-200">
+                                            <span class="input-wrapper"><span contenteditable="true" class="input-box" data-answer="1/x" data-concept="derivative of natural log ln(x)"></span><button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Help</button></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- MINI CHALLENGE 2 -->
+                    <div class="practice-area">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6 border-b border-white/20 pb-6 w-full">
+                            <div>
+                                <h3 class="font-extrabold text-2xl text-white tracking-tight m-0">Knowledge Check</h3>
+                                <p class="text-sm text-gray-300 mt-1 font-medium m-0">Test your memory on the basic rules above.</p>
+                            </div>
+                            <button onclick="generateProblem(this, 'basic')" class="btn-gold px-6 py-3 font-bold flex items-center gap-3">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                Generate AI Question
+                            </button>
+                        </div>
+                        
+                        <div class="ai-problem-container hidden bg-white/5 p-6 md:p-8 rounded-3xl border border-white/20 mt-4 backdrop-blur-md w-full">
+                            <div class="ai-problem-text text-lg md:text-xl mb-8 text-white font-bold leading-relaxed overflow-x-auto pb-2"></div>
+                            <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/10 shadow-inner w-full">
+                                <label class="font-bold text-gray-200 text-sm uppercase tracking-wider pl-2 shrink-0">$f'(x) =$</label>
+                                <span class="input-wrapper w-full sm:w-auto flex-1">
+                                    <span contenteditable="true" class="ai-input input-box w-full sm:min-w-[200px] text-lg !border-gray-500 !bg-white/10 !text-white focus:!bg-white/20" data-answer="" data-problem=""></span>
+                                </span>
+                                <div class="flex gap-3 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
+                                    <button onclick="checkAiAnswer(this)" class="flex-1 sm:flex-none bg-white/10 text-white hover:bg-white/20 px-6 py-2.5 rounded-full font-bold border border-white/20">Check</button>
+                                    <button onclick="discussProblemInline(this)" class="flex-1 sm:flex-none bg-[var(--accent-primary)] text-white px-5 py-2.5 rounded-full font-bold hover:opacity-90 shadow-lg">Tutor</button>
+                                </div>
+                            </div>
+                            <div class="ai-feedback mt-6 text-sm font-bold bg-black/40 p-4 rounded-xl hidden border border-white/10"></div>
+                            
+                            <div class="inline-problem-chat hidden mt-8 bg-black/30 rounded-[24px] border border-white/10 overflow-hidden flex-col shadow-inner w-full">
+                                <div class="chat-history p-5 md:p-6 space-y-5 max-h-[300px] overflow-y-auto text-[15px] text-gray-200 scroll-smooth"></div>
+                                <div class="p-4 md:p-5 bg-black/40 border-t border-white/5 flex gap-3 items-center w-full">
+                                    <input type="text" placeholder="Ask a question..." class="chat-input flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-[15px] text-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] min-w-0" onkeydown="if(event.key === 'Enter') sendInlineProblemChat(this)">
+                                    <button onclick="sendInlineProblemChat(this)" class="bg-[var(--accent-primary)] text-white w-12 h-12 rounded-full flex items-center justify-center font-bold hover:opacity-90 shrink-0">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- SECTION 3: Complex Rules -->
+                <section class="lesson-card" id="section-3">
+                    <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 pb-2 border-b border-gray-100">
+                        <h2 class="section-title m-0 flex items-center">
+                            <span class="section-badge">3</span> Complex Rules
+                        </h2>
+                        <button onclick="aiExplain('Product, Quotient, and Chain rules for differentiation explained simply', this)" class="btn-ai">
+                            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Concept Breakdown
+                        </button>
+                    </div>
+                    
+                    <!-- Interactive Video Block -->
+                    <div class="video-block w-full bg-[#1c1c1e] rounded-[24px] aspect-[16/9] md:aspect-[21/9] flex flex-col items-center justify-center text-white mb-10 shadow-lg relative overflow-hidden group border-2 border-transparent hover:border-gray-600 transition-all" data-title="Complex & Combined Rules" data-time="15:30">
+                        
+                        <div class="video-state-default absolute inset-0 flex flex-col items-center justify-center z-20 cursor-pointer transition-opacity duration-300" onclick="playVideoInline(this.closest('.video-block'))">
+                            <div class="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-all duration-500 z-10 text-white shadow-lg">
+                                <svg class="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <div class="absolute bottom-6 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Complex & Combined Rules</p>
+                                <p class="text-xs font-bold tracking-wider uppercase text-gray-300 mt-1 m-0">Click to Play Expanded</p>
+                            </div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 z-0"></div>
+                        </div>
+                        
+                        <div class="video-state-inline opacity-0 pointer-events-none absolute inset-0 bg-black z-30 flex flex-col items-center justify-center transition-opacity duration-300">
+                            <svg class="w-12 h-12 text-white/30 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <div class="absolute top-4 right-4 flex gap-2 z-40">
+                                <button onclick="pinToSidebar(event, this.closest('.video-block'))" class="bg-black/50 hover:bg-black/80 text-white rounded-full py-2 px-4 backdrop-blur-md transition flex items-center gap-2 text-sm font-bold border border-white/10 pointer-events-auto" title="Pin to Sidebar to take notes">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                                    Pin to Sidebar
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Playing: Complex & Combined Rules</p>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                                <div class="h-full bg-[var(--accent-primary)] animate-[progress-play_30s_linear_infinite]"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-state-pinned opacity-0 pointer-events-none absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-30 backdrop-blur-sm transition-opacity duration-300">
+                            <div class="w-12 h-12 bg-[var(--accent-primary)] rounded-full flex items-center justify-center text-white mb-3 shadow-[0_0_15px_var(--accent-primary)] animate-pulse">
+                                <svg class="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <p class="font-bold text-white text-lg m-0">Playing in Sidebar</p>
+                            <p class="text-sm text-gray-400 mt-1 m-0">Scroll down to take notes</p>
+                            <button onclick="expandFromSidebar(event)" class="mt-4 bg-white/10 hover:bg-white/20 text-white rounded-full px-4 py-2 font-bold text-sm backdrop-blur-md transition border border-white/10 pointer-events-auto flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                Expand Video
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-10 text-[17px] text-gray-800 font-medium">
+                        
+                        <div class="bg-[#f5f5f7] p-6 md:p-8 rounded-[24px] border border-gray-200 w-full">
+                            <h3 class="font-extrabold text-xl text-slate-900 mb-5 tracking-tight m-0">The Product Rule</h3>
+                            <div class="bg-white p-5 rounded-2xl border border-gray-300 mb-6 shadow-sm text-center leading-loose overflow-x-auto text-lg font-semibold text-slate-800 w-full">
+                                If $F(x) = f(x)g(x)$, then $F'(x) = f'(x)g(x) +$ 
+                                <span class="input-wrapper">
+                                    <span contenteditable="true" class="input-box" data-answer="g'(x)f(x)" data-concept="the second half of the product rule formula"></span>
+                                    <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                </span>
+                            </div>
+                            <p class="leading-loose overflow-x-auto"><strong>Example:</strong> For $k(x) = 7e^x(x^3-2)$, the derivative is: <br>
+                            $k'(x) = 7e^x(x^3-2) + $ 
+                            <span class="input-wrapper">
+                                <span contenteditable="true" class="input-box !py-0" data-answer="3x^2" data-concept="derivative of (x^3 - 2)"></span>
+                                <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                            </span> 
+                            $\cdot (7e^x)$</p>
+                        </div>
+
+                        <div class="bg-[#f5f5f7] p-6 md:p-8 rounded-[24px] border border-gray-200 w-full">
+                            <h3 class="font-extrabold text-xl text-slate-900 mb-5 tracking-tight m-0">The Quotient Rule</h3>
+                            <div class="bg-white p-5 rounded-2xl border border-gray-300 mb-6 shadow-sm text-center overflow-x-auto whitespace-nowrap text-lg font-semibold text-slate-800 w-full">
+                                If $F(x) = \frac{f(x)}{g(x)}$, then $F'(x) = \frac{f'(x)g(x) - g'(x)f(x)}{[g(x)]^2}$
+                            </div>
+                            <p class="mb-5"><strong>Example:</strong> $h(s) = \frac{-6s^{1/2}}{3s^2+2s}$. Identify the derivatives of top and bottom:</p>
+                            <ul class="ml-6 list-disc space-y-4 text-slate-800 font-semibold overflow-x-auto">
+                                <li class="leading-loose pl-2">Numerator deriv. $f'(s) = $ 
+                                    <span class="input-wrapper">
+                                        <span contenteditable="true" class="input-box !py-0" data-answer="-3s^{-1/2}" data-concept="power rule on -6s^(1/2)"></span>
+                                        <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                    </span>
+                                </li>
+                                <li class="leading-loose pl-2">Denominator deriv. $g'(s) = $ 
+                                    <span class="input-wrapper">
+                                        <span contenteditable="true" class="input-box !py-0" data-answer="6s+2" data-concept="derivative of 3s^2 + 2s"></span>
+                                        <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-[#f5f5f7] p-6 md:p-8 rounded-[24px] border border-gray-200 w-full">
+                            <h3 class="font-extrabold text-xl text-slate-900 mb-5 tracking-tight m-0">The Chain Rule</h3>
+                            <div class="bg-white p-5 rounded-2xl border border-gray-300 mb-6 shadow-sm text-center leading-loose overflow-x-auto text-lg font-semibold text-slate-800 w-full">
+                                If $F(x) = f(g(x))$, then $F'(x) = f'(g(x)) \cdot$ 
+                                <span class="input-wrapper">
+                                    <span contenteditable="true" class="input-box" data-answer="g'(x)" data-concept="the chain rule multiplier"></span>
+                                    <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                </span>
+                            </div>
+                            <p class="text-[var(--accent-primary)] font-extrabold mb-6"><em>"Derivative of the outside, leave the inside alone, times derivative of the inside."</em></p>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                                <div class="bg-white p-6 border border-gray-300 rounded-2xl shadow-sm overflow-x-auto">
+                                    <p class="font-extrabold text-slate-900 mb-4 whitespace-nowrap m-0">1. $\frac{d}{dx} \ln(10-7x)$</p>
+                                    <p class="whitespace-nowrap font-semibold m-0">$= \frac{1}{10-7x} \cdot ($
+                                        <span class="input-wrapper">
+                                            <span contenteditable="true" class="input-box !py-0 !min-w-[60px]" data-answer="-7" data-concept="derivative of inside function 10-7x"></span>
+                                            <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                        </span>
+                                    $)$</p>
+                                </div>
+                                <div class="bg-white p-6 border border-gray-300 rounded-2xl shadow-sm overflow-x-auto">
+                                    <p class="font-extrabold text-slate-900 mb-4 whitespace-nowrap m-0">2. $\frac{d}{dx} e^{0.01x^3}$</p>
+                                    <p class="whitespace-nowrap font-semibold m-0">$= e^{0.01x^3} \cdot ($
+                                        <span class="input-wrapper">
+                                            <span contenteditable="true" class="input-box !py-0 !min-w-[80px]" data-answer="0.03x^2" data-concept="derivative of inside function 0.01x^3"></span>
+                                            <button class="inline-help-btn" onclick="triggerSocraticHelpInline(this)">Ask AI</button>
+                                        </span>
+                                    $)$</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MINI CHALLENGE 3 -->
+                    <div class="practice-area">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6 border-b border-white/20 pb-6 w-full">
+                            <div>
+                                <h3 class="font-extrabold text-2xl text-white tracking-tight m-0">Knowledge Check</h3>
+                                <p class="text-sm text-gray-300 mt-1 font-medium m-0">Apply Product, Quotient, or Chain rules.</p>
+                            </div>
+                            <button onclick="generateProblem(this, 'complex')" class="btn-gold px-6 py-3 font-bold flex items-center gap-3">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                Generate AI Question
+                            </button>
+                        </div>
+                        
+                        <div class="ai-problem-container hidden bg-white/5 p-6 md:p-8 rounded-3xl border border-white/20 mt-4 backdrop-blur-md w-full">
+                            <div class="ai-problem-text text-lg md:text-xl mb-8 text-white font-bold leading-relaxed overflow-x-auto pb-2"></div>
+                            <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/10 shadow-inner w-full">
+                                <label class="font-bold text-gray-200 text-sm uppercase tracking-wider pl-2 shrink-0">$f'(x) =$</label>
+                                <span class="input-wrapper w-full sm:w-auto flex-1">
+                                    <span contenteditable="true" class="ai-input input-box w-full sm:min-w-[200px] text-lg !border-gray-500 !bg-white/10 !text-white focus:!bg-white/20" data-answer="" data-problem=""></span>
+                                </span>
+                                <div class="flex gap-3 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
+                                    <button onclick="checkAiAnswer(this)" class="flex-1 sm:flex-none bg-white/10 text-white hover:bg-white/20 px-6 py-2.5 rounded-full font-bold border border-white/20">Check</button>
+                                    <button onclick="discussProblemInline(this)" class="flex-1 sm:flex-none bg-[var(--accent-primary)] text-white px-5 py-2.5 rounded-full font-bold hover:opacity-90 shadow-lg">Tutor</button>
+                                </div>
+                            </div>
+                            <div class="ai-feedback mt-6 text-sm font-bold bg-black/40 p-4 rounded-xl hidden border border-white/10"></div>
+                            
+                            <div class="inline-problem-chat hidden mt-8 bg-black/30 rounded-[24px] border border-white/10 overflow-hidden flex-col shadow-inner w-full">
+                                <div class="chat-history p-5 md:p-6 space-y-5 max-h-[300px] overflow-y-auto text-[15px] text-gray-200 scroll-smooth"></div>
+                                <div class="p-4 md:p-5 bg-black/40 border-t border-white/5 flex gap-3 items-center w-full">
+                                    <input type="text" placeholder="Ask a question..." class="chat-input flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-[15px] text-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] min-w-0" onkeydown="if(event.key === 'Enter') sendInlineProblemChat(this)">
+                                    <button onclick="sendInlineProblemChat(this)" class="bg-[var(--accent-primary)] text-white w-12 h-12 rounded-full flex items-center justify-center font-bold hover:opacity-90 shrink-0">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- SECTION 4: Applications -->
+                <section class="lesson-card" id="section-4">
+                    <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 pb-2 border-b border-gray-100">
+                        <h2 class="section-title m-0 flex items-center">
+                            <span class="section-badge">4</span> Real-World Applications
+                        </h2>
+                        <button onclick="aiExplain('How calculus and rates of change are used in real-world applications', this)" class="btn-ai">
+                            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Industry Context
+                        </button>
+                    </div>
+
+                    <!-- Interactive Video Block -->
+                    <div class="video-block w-full bg-[#1c1c1e] rounded-[24px] aspect-[16/9] md:aspect-[21/9] flex flex-col items-center justify-center text-white mb-10 shadow-lg relative overflow-hidden group border-2 border-transparent hover:border-gray-600 transition-all" data-title="Real-World Applications" data-time="10:45">
+                        
+                        <div class="video-state-default absolute inset-0 flex flex-col items-center justify-center z-20 cursor-pointer transition-opacity duration-300" onclick="playVideoInline(this.closest('.video-block'))">
+                            <div class="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-all duration-500 z-10 text-white shadow-lg">
+                                <svg class="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <div class="absolute bottom-6 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Real-World Applications</p>
+                                <p class="text-xs font-bold tracking-wider uppercase text-gray-300 mt-1 m-0">Click to Play Expanded</p>
+                            </div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 z-0"></div>
+                        </div>
+                        
+                        <div class="video-state-inline opacity-0 pointer-events-none absolute inset-0 bg-black z-30 flex flex-col items-center justify-center transition-opacity duration-300">
+                            <svg class="w-12 h-12 text-white/30 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <div class="absolute top-4 right-4 flex gap-2 z-40">
+                                <button onclick="pinToSidebar(event, this.closest('.video-block'))" class="bg-black/50 hover:bg-black/80 text-white rounded-full py-2 px-4 backdrop-blur-md transition flex items-center gap-2 text-sm font-bold border border-white/10 pointer-events-auto" title="Pin to Sidebar to take notes">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                                    Pin to Sidebar
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-6 z-10 text-left">
+                                <p class="font-bold text-white text-lg tracking-tight m-0">Playing: Real-World Applications</p>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                                <div class="h-full bg-[var(--accent-primary)] animate-[progress-play_30s_linear_infinite]"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-state-pinned opacity-0 pointer-events-none absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-30 backdrop-blur-sm transition-opacity duration-300">
+                            <div class="w-12 h-12 bg-[var(--accent-primary)] rounded-full flex items-center justify-center text-white mb-3 shadow-[0_0_15px_var(--accent-primary)] animate-pulse">
+                                <svg class="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <p class="font-bold text-white text-lg m-0">Playing in Sidebar</p>
+                            <p class="text-sm text-gray-400 mt-1 m-0">Scroll down to take notes</p>
+                            <button onclick="expandFromSidebar(event)" class="mt-4 bg-white/10 hover:bg-white/20 text-white rounded-full px-4 py-2 font-bold text-sm backdrop-blur-md transition border border-white/10 pointer-events-auto flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                Expand Video
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6 text-[17px] text-gray-800 font-medium">
+                        <p>Calculus isn't just about formulas; it models the real world. A derivative represents the <strong>rate of change</strong> of any function, whether that's velocity in physics, marginal cost in business, or population growth in biology.</p>
+                    </div>
+
+                    <!-- MINI CHALLENGE 4 -->
+                    <div class="practice-area">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6 border-b border-white/20 pb-6 w-full">
+                            <div>
+                                <h3 class="font-extrabold text-2xl text-white tracking-tight m-0">Themed Scenario</h3>
+                                <p class="text-sm text-gray-300 mt-1 font-medium m-0">Solve a word problem tailored to your selected industry focus.</p>
+                            </div>
+                            <button onclick="generateProblem(this, 'application')" class="btn-gold px-6 py-3 font-bold flex items-center gap-3">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                Generate Scenario
+                            </button>
+                        </div>
+                        
+                        <div class="ai-problem-container hidden bg-white/5 p-6 md:p-8 rounded-3xl border border-white/20 mt-4 backdrop-blur-md w-full">
+                            <div class="ai-problem-text text-lg md:text-xl mb-8 text-white font-bold leading-relaxed overflow-x-auto pb-2"></div>
+                            <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/10 shadow-inner w-full">
+                                <label class="font-bold text-gray-200 text-sm uppercase tracking-wider pl-2 shrink-0">Answer:</label>
+                                <span class="input-wrapper w-full sm:w-auto flex-1">
+                                    <span contenteditable="true" class="ai-input input-box w-full sm:min-w-[200px] text-lg !border-gray-500 !bg-white/10 !text-white focus:!bg-white/20" data-answer="" data-problem=""></span>
+                                </span>
+                                <div class="flex gap-3 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
+                                    <button onclick="checkAiAnswer(this)" class="flex-1 sm:flex-none bg-white/10 text-white hover:bg-white/20 px-6 py-2.5 rounded-full font-bold border border-white/20">Check</button>
+                                    <button onclick="discussProblemInline(this)" class="flex-1 sm:flex-none bg-[var(--accent-primary)] text-white px-5 py-2.5 rounded-full font-bold hover:opacity-90 shadow-lg">Tutor</button>
+                                </div>
+                            </div>
+                            <div class="ai-feedback mt-6 text-sm font-bold bg-black/40 p-4 rounded-xl hidden border border-white/10"></div>
+
+                            <div class="inline-problem-chat hidden mt-8 bg-black/30 rounded-[24px] border border-white/10 overflow-hidden flex-col shadow-inner w-full">
+                                <div class="chat-history p-5 md:p-6 space-y-5 max-h-[300px] overflow-y-auto text-[15px] text-gray-200 scroll-smooth"></div>
+                                <div class="p-4 md:p-5 bg-black/40 border-t border-white/5 flex gap-3 items-center w-full">
+                                    <input type="text" placeholder="Ask a question..." class="chat-input flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-[15px] text-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] min-w-0" onkeydown="if(event.key === 'Enter') sendInlineProblemChat(this)">
+                                    <button onclick="sendInlineProblemChat(this)" class="bg-[var(--accent-primary)] text-white w-12 h-12 rounded-full flex items-center justify-center font-bold hover:opacity-90 shrink-0">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+            </main> 
+        </div>
+    </div>
+
+    <!-- GLOBAL AI Floating Bubble -->
+    <div class="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[110]">
+        <button onclick="toggleChat()" class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-slate-900 text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 transition-transform duration-300 border-2 border-white/20 backdrop-blur-md outline-none" aria-label="Toggle Socratic AI Tutor Chat window">
+            <svg class="w-6 h-6 md:w-7 md:h-7" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+        </button>
+        <div id="ai-chat-window" class="hidden absolute bottom-20 right-0 w-[calc(100vw-3rem)] max-w-[380px] bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-300 overflow-hidden flex flex-col h-[500px] md:h-[600px] max-h-[85vh] transition-all" role="dialog" aria-label="AI Tutor Chat">
+            <div class="bg-slate-900 p-5 md:p-6 text-white flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="text-base md:text-lg font-bold tracking-tight flex items-center gap-2 m-0">
+                        <span class="w-2 h-2 rounded-full bg-[var(--accent-secondary)]"></span>
+                        AI Calculus Tutor
+                    </h3>
+                    <p class="text-[11px] text-gray-300 font-bold tracking-widest mt-1 uppercase m-0">Always Here to Help</p>
+                </div>
+                <button onclick="toggleChat()" class="text-white/80 hover:text-white bg-white/10 w-8 h-8 rounded-full flex items-center justify-center outline-none transition" aria-label="Close Chat Window">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="chat-history" class="flex-1 overflow-y-auto p-5 md:p-6 space-y-5 text-sm md:text-[15px]">
+                <div class="bg-[#f5f5f7] border border-gray-200 p-4 md:p-5 rounded-[20px] rounded-tl-none shadow-sm text-slate-800 leading-relaxed font-bold">Hello! I'm here to help you learn about calculus and differentiation. If you're stuck on filling in a blank, tell me what you're thinking, and we'll figure it out together!</div>
+            </div>
+            <div class="p-4 md:p-5 border-t border-gray-200 bg-white/50 flex gap-2 md:gap-3 shrink-0">
+                <label for="chat-input" class="sr-only">Type your question for the AI tutor</label>
+                <input id="chat-input" type="text" placeholder="Ask a question..." class="flex-1 bg-[#f5f5f7] border border-gray-300 rounded-full px-5 py-3 text-sm md:text-[15px] font-bold text-slate-900 focus:bg-white focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 outline-none transition shadow-inner">
+                <button onclick="sendChat()" class="w-12 h-12 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center hover:opacity-90 transition shadow-md outline-none shrink-0" aria-label="Send message to tutor">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explanation Modal (Glassmorphic) -->
+    <div id="ai-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 transition-all" aria-modal="true" role="dialog" aria-labelledby="modal-title">
+        <div class="bg-white/95 backdrop-blur-xl max-w-2xl w-full rounded-[32px] shadow-2xl border border-gray-300 overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div class="p-5 md:p-6 border-b border-gray-200 flex justify-between items-center bg-white/50 shrink-0">
+                <h3 id="modal-title" class="font-extrabold text-slate-900 text-lg md:text-xl tracking-tight flex items-center gap-3 m-0">
+                    <span class="bg-[var(--accent-primary)] text-white p-2 rounded-full shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></span>
+                    Concept Breakdown
+                </h3>
+                <button onclick="closeModal()" class="text-slate-600 hover:text-slate-900 bg-[#f5f5f7] border border-gray-300 rounded-full w-9 h-9 flex items-center justify-center transition outline-none" aria-label="Close concept breakdown modal">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div id="modal-scroll-area" class="flex-1 overflow-y-auto flex flex-col">
+                <div id="modal-body" class="p-6 md:p-10 text-[17px] text-gray-800 leading-relaxed shrink-0 font-medium"></div>
+                
+                <div id="inline-chat-section" class="hidden flex-col border-t border-gray-200 bg-[#fcfcfd] flex-1">
+                    <div id="inline-chat-history" class="p-6 md:p-8 space-y-5 text-[15px] flex-1 text-slate-800"></div>
+                    <div class="p-4 md:p-5 border-t border-gray-200 bg-white/80 backdrop-blur-md flex gap-3 shrink-0 sticky bottom-0">
+                        <label for="inline-chat-input" class="sr-only">Type a follow-up question for the tutor</label>
+                        <input id="inline-chat-input" type="text" placeholder="Ask a follow-up question..." class="flex-1 bg-[#f5f5f7] border border-gray-300 rounded-full px-5 py-3.5 text-[15px] font-bold text-slate-900 focus:bg-white focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 outline-none transition shadow-inner">
+                        <button onclick="sendInlineChat()" class="w-12 h-12 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center hover:opacity-90 transition shadow-md outline-none shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- 4. Worksheet Logic Script -->
+    <script>
+        // API KEY SETUP
+        const apiKey = ""; 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'math-portfolio-sample';
+        let currentInlineTopic = "";
+        let activeVideoElement = null;
+        let isFlying = false;
+
+        // Run when the custom HTML block has loaded into the WP DOM
+        function initApp() {
+            initMath(document.getElementById('interactive-worksheet-app'));
+            setupInputListeners();
+            drawTangentGraph();
+            
+            const inlineInput = document.getElementById('inline-chat-input');
+            const chatInput = document.getElementById('chat-input');
+            
+            if(inlineInput) {
+                inlineInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') sendInlineChat();
+                });
+            }
+            if(chatInput) {
+                chatInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') sendChat();
+                });
+            }
+
+            // Window resize handler for mobile PIP logic
+            window.addEventListener('resize', handleVideoResize);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+
+        // FORMAT GEMINI RESPONSE: Handles bold tags and newlines safely before passing to KaTeX
+        function formatGeminiResponse(text) {
+            let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            return formatted.replace(/\n/g, '<br>');
+        }
+
+        function getMajorContext() {
+            const major = document.getElementById('major-selector').value;
+            if (major === "General Tech") return "";
+            return ` The user is exploring calculus applications in ${major}. Please tailor your examples, analogies, and variables specifically to this industry to make the concepts relevant to them.`;
+        }
+
+        function initMath(element) {
+            if (!element) return;
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(element, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '\\[', right: '\\]', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        async function callGemini(prompt, system) {
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: { parts: [{ text: system }] }
+                    })
+                });
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "Error fetching AI response.";
+            } catch (err) {
+                return "Failed to connect to AI. Please check your connection.";
+            }
+        }
+
+        function handleVideoResize() {
+            const sidebarPlayer = document.getElementById('sidebar-video-player');
+            if(sidebarPlayer.classList.contains('hidden')) return;
+
+            if (window.innerWidth < 1024) {
+                // Mobile PIP style
+                sidebarPlayer.classList.add('fixed', 'bottom-4', 'right-4', 'w-72', 'max-w-[calc(100vw-2rem)]', 'z-[100]', 'shadow-2xl');
+                sidebarPlayer.classList.remove('relative', 'w-full');
+            } else {
+                // Desktop standard sidebar block
+                sidebarPlayer.classList.remove('fixed', 'bottom-4', 'right-4', 'w-72', 'max-w-[calc(100vw-2rem)]', 'z-[100]', 'shadow-2xl');
+                sidebarPlayer.classList.add('relative', 'w-full');
+            }
+        }
+
+        function resetVideoState(element) {
+            if (!element) return;
+            element.classList.remove('!border-[var(--accent-primary)]');
+            const defState = element.querySelector('.video-state-default');
+            const inlineState = element.querySelector('.video-state-inline');
+            const pinnedState = element.querySelector('.video-state-pinned');
+            
+            if (defState) defState.classList.remove('opacity-0', 'pointer-events-none');
+            if (inlineState) inlineState.classList.add('opacity-0', 'pointer-events-none');
+            if (pinnedState) pinnedState.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function playVideoInline(element) {
+            if(isFlying || activeVideoElement === element || !element) return; 
+
+            // 1. Reset previously active video
+            resetVideoState(activeVideoElement);
+
+            // 2. Set new video to playing inline
+            activeVideoElement = element;
+            element.classList.add('!border-[var(--accent-primary)]');
+            
+            const defState = element.querySelector('.video-state-default');
+            const inlineState = element.querySelector('.video-state-inline');
+            const pinnedState = element.querySelector('.video-state-pinned');
+
+            if(defState) defState.classList.add('opacity-0', 'pointer-events-none');
+            if(inlineState) inlineState.classList.remove('opacity-0', 'pointer-events-none');
+            if(pinnedState) pinnedState.classList.add('opacity-0', 'pointer-events-none');
+
+            // 3. Hide the sidebar player
+            const sidebar = document.getElementById('sidebar-video-player');
+            if(sidebar) sidebar.classList.add('hidden');
+        }
+
+        function pinToSidebar(event, element) {
+            if(event) event.stopPropagation();
+            if(isFlying || !element) return;
+            isFlying = true;
+
+            const title = element.dataset.title;
+            const time = element.dataset.time;
+            
+            const titleEl = document.getElementById('sidebar-video-title');
+            const timeEl = document.getElementById('sidebar-video-time');
+            if(titleEl) titleEl.textContent = title;
+            if(timeEl) timeEl.textContent = 'Lecture Video • ' + time;
+            
+            const sidebarPlayer = document.getElementById('sidebar-video-player');
+            const sidebarVideoBox = document.getElementById('sidebar-video-box');
+            
+            // Hide the inline UI immediately
+            const inlineState = element.querySelector('.video-state-inline');
+            if(inlineState) inlineState.classList.add('opacity-0', 'pointer-events-none');
+            
+            const startRect = element.getBoundingClientRect();
+            
+            // Prepare sidebar without visual flash
+            sidebarPlayer.classList.remove('hidden');
+            sidebarPlayer.style.opacity = '0';
+            sidebarPlayer.style.transition = 'none';
+            handleVideoResize();
+            
+            setTimeout(() => {
+                const targetRect = sidebarVideoBox.getBoundingClientRect();
+                
+                // Create Ghost flying element
+                document.querySelectorAll('.ghost-video').forEach(e => e.remove());
+                const ghost = document.createElement('div');
+                ghost.className = 'ghost-video fixed z-[9999] bg-[#1c1c1e] flex flex-col items-center justify-center shadow-2xl border border-gray-600 overflow-hidden';
+                ghost.style.transition = 'all 600ms cubic-bezier(0.25, 1, 0.5, 1)';
+                ghost.style.top = startRect.top + 'px';
+                ghost.style.left = startRect.left + 'px';
+                ghost.style.width = startRect.width + 'px';
+                ghost.style.height = startRect.height + 'px';
+                ghost.style.borderRadius = '24px';
+                
+                ghost.innerHTML = `
+                    <div class="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] ghost-icon">
+                        <svg class="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                `;
+                document.body.appendChild(ghost);
+                
+                // Force reflow
+                ghost.getBoundingClientRect();
+                
+                // Fly to sidebar destination
+                ghost.style.top = targetRect.top + 'px';
+                ghost.style.left = targetRect.left + 'px';
+                ghost.style.width = targetRect.width + 'px';
+                ghost.style.height = targetRect.height + 'px';
+                ghost.style.borderRadius = '12px';
+                
+                const ghostIcon = ghost.querySelector('.ghost-icon');
+                if(ghostIcon) {
+                    ghostIcon.style.transform = 'scale(0.6)';
+                    ghostIcon.style.opacity = '0';
+                }
+                
+                // Fade in sidebar player smoothly halfway through
+                setTimeout(() => {
+                    sidebarPlayer.style.transition = 'opacity 300ms ease';
+                    sidebarPlayer.style.opacity = '1';
+                    const pinnedState = element.querySelector('.video-state-pinned');
+                    if(pinnedState) pinnedState.classList.remove('opacity-0', 'pointer-events-none');
+                }, 400);
+
+                setTimeout(() => {
+                    ghost.style.opacity = '0';
+                    setTimeout(() => ghost.remove(), 300);
+                    
+                    // Auto-scroll to the first input box so they can take notes
+                    const firstInput = element.parentElement.querySelector('.input-box');
+                    if(firstInput) {
+                        const y = firstInput.getBoundingClientRect().top + window.scrollY - 150;
+                        window.scrollTo({top: y, behavior: 'smooth'});
+                        setTimeout(() => firstInput.focus(), 600);
+                    }
+                    isFlying = false;
+                }, 600);
+                
+            }, 20); 
+        }
+
+        function expandFromSidebar(event) {
+            if(event) event.stopPropagation();
+            if(!activeVideoElement || isFlying) return;
+            isFlying = true;
+
+            const sidebarPlayer = document.getElementById('sidebar-video-player');
+            const sidebarVideoBox = document.getElementById('sidebar-video-box');
+            
+            // Hide pinned placeholder
+            const pinnedState = activeVideoElement.querySelector('.video-state-pinned');
+            if(pinnedState) pinnedState.classList.add('opacity-0', 'pointer-events-none');
+            
+            const startRect = sidebarVideoBox.getBoundingClientRect();
+            
+            sidebarPlayer.style.opacity = '0';
+            setTimeout(() => sidebarPlayer.classList.add('hidden'), 300);
+
+            const targetRect = activeVideoElement.getBoundingClientRect();
+
+            document.querySelectorAll('.ghost-video').forEach(e => e.remove());
+            const ghost = document.createElement('div');
+            ghost.className = 'ghost-video fixed z-[9999] bg-[#1c1c1e] flex flex-col items-center justify-center shadow-2xl border border-gray-600 overflow-hidden';
+            ghost.style.transition = 'all 600ms cubic-bezier(0.25, 1, 0.5, 1)';
+            ghost.style.top = startRect.top + 'px';
+            ghost.style.left = startRect.left + 'px';
+            ghost.style.width = startRect.width + 'px';
+            ghost.style.height = startRect.height + 'px';
+            ghost.style.borderRadius = '12px';
+            
+            document.body.appendChild(ghost);
+            
+            // Force reflow
+            ghost.getBoundingClientRect();
+            
+            // Fly back to original element
+            ghost.style.top = targetRect.top + 'px';
+            ghost.style.left = targetRect.left + 'px';
+            ghost.style.width = targetRect.width + 'px';
+            ghost.style.height = targetRect.height + 'px';
+            ghost.style.borderRadius = '24px';
+
+            setTimeout(() => {
+                const inlineState = activeVideoElement.querySelector('.video-state-inline');
+                if(inlineState) inlineState.classList.remove('opacity-0', 'pointer-events-none');
+                ghost.style.opacity = '0';
+                
+                setTimeout(() => {
+                    ghost.remove();
+                    // Scroll back to the inline video
+                    const y = activeVideoElement.getBoundingClientRect().top + window.scrollY - 150;
+                    window.scrollTo({top: y, behavior: 'smooth'});
+                    isFlying = false;
+                }, 300);
+            }, 600);
+        }
+
+        function closeSidebarVideo() {
+            const sidebar = document.getElementById('sidebar-video-player');
+            if (sidebar) sidebar.classList.add('hidden');
+            if(activeVideoElement) {
+                resetVideoState(activeVideoElement);
+                activeVideoElement = null;
+            }
+        }
+
+        function dismissInstructions() {
+            const banner = document.getElementById('how-to-use-banner');
+            if (banner) {
+                banner.style.opacity = '0';
+                banner.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    banner.style.display = 'none';
+                }, 500);
+            }
+        }
+
+        async function aiExplain(topic, btn) {
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="loading-spinner"></span> <span class="ml-2 font-bold">Loading...</span>`;
+            
+            const system = "You are an expert Math and Calculus tutor. Explain the conceptual intuition behind the topic. Focus on helping the student understand *why* the concept matters in calculus differentiation. Use LaTeX for math notation if applicable. Keep it concise, engaging, and under 150 words." + getMajorContext();
+            const explanation = await callGemini(`Provide a conceptual explanation for: ${topic} in the context of differentiation rules.`, system);
+            
+            const body = document.getElementById('modal-body');
+            
+            body.innerHTML = `
+                <div class="space-y-6">
+                    <h4 class="font-extrabold text-slate-900 text-2xl md:text-3xl tracking-tight leading-tight m-0">${topic}</h4>
+                    <div class="text-gray-800 leading-relaxed font-medium text-[17px]">
+                        ${formatGeminiResponse(explanation)}
+                    </div>
+                    <div id="discuss-btn-container" class="mt-8 pt-8 border-t border-gray-200 flex justify-start">
+                        <button onclick="startInlineDiscussion('${topic.replace(/'/g, "\\'")}')" class="inline-flex items-center bg-[var(--accent-primary)] text-white px-6 py-3 rounded-full font-bold hover:opacity-90 transition shadow-md text-sm">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                            Discuss with Tutor
+                        </button>
+                    </div>
+                </div>
+            `;
+            initMath(body);
+            
+            document.getElementById('ai-modal').classList.remove('hidden');
+            
+            btn.disabled = false;
+            btn.innerHTML = original;
+        }
+
+        function startInlineDiscussion(topic) {
+            currentInlineTopic = topic;
+            document.getElementById('discuss-btn-container').style.display = 'none';
+            
+            const chatSection = document.getElementById('inline-chat-section');
+            const chatHistory = document.getElementById('inline-chat-history');
+            
+            chatSection.classList.remove('hidden');
+            chatSection.classList.add('flex');
+            
+            chatHistory.innerHTML = `
+                <div class="bg-white border border-gray-200 p-5 rounded-[20px] rounded-tl-none mr-auto max-w-[90%] shadow-sm text-slate-800 font-bold leading-relaxed">
+                    I'm here to help you understand <strong>${topic}</strong> in the context of Calculus! What part is confusing, or what would you like to explore further?
+                </div>
+            `;
+            
+            setTimeout(() => {
+                const scrollArea = document.getElementById('modal-scroll-area');
+                scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: 'smooth' });
+                document.getElementById('inline-chat-input').focus();
+            }, 100);
+        }
+
+        async function sendInlineChat() {
+            const input = document.getElementById('inline-chat-input');
+            const history = document.getElementById('inline-chat-history');
+            const scrollArea = document.getElementById('modal-scroll-area');
+            const val = input.value.trim();
+            if(!val) return;
+
+            const uDiv = document.createElement('div');
+            uDiv.className = "bg-[var(--accent-primary)] text-white font-bold p-4 md:p-5 rounded-[20px] rounded-tr-none ml-auto max-w-[85%] text-right shadow-sm";
+            uDiv.textContent = val;
+            history.appendChild(uDiv);
+            input.value = "";
+            scrollArea.scrollTop = scrollArea.scrollHeight;
+
+            const uDivLoading = document.createElement('div');
+            uDivLoading.className = "bg-white border border-gray-200 p-4 md:p-5 rounded-[20px] rounded-tl-none mr-auto max-w-[85%] shadow-sm flex items-center text-slate-600 font-bold";
+            uDivLoading.innerHTML = `<span class="loading-spinner border-gray-400 border-b-transparent w-4 h-4 md:w-5 md:h-5 mr-3"></span> Thinking...`;
+            history.appendChild(uDivLoading);
+            scrollArea.scrollTop = scrollArea.scrollHeight;
+
+            let system = "You are an expert Math and Calculus tutor. You are discussing the concept: '" + currentInlineTopic + "'. Help the student THINK through it using the Socratic method. Be encouraging, supportive, and brief. Use LaTeX for math." + getMajorContext();
+            const resp = await callGemini(val, system);
+
+            history.removeChild(uDivLoading);
+            const aDiv = document.createElement('div');
+            aDiv.className = "bg-white border border-gray-200 p-4 md:p-5 rounded-[20px] rounded-tl-none mr-auto max-w-[90%] shadow-sm text-slate-800 font-bold leading-relaxed";
+            aDiv.innerHTML = formatGeminiResponse(resp);
+            history.appendChild(aDiv);
+            initMath(aDiv);
+            scrollArea.scrollTop = scrollArea.scrollHeight;
+        }
+
+        async function generateProblem(btn, topic) {
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="loading-spinner"></span> <span class="ml-2">Generating...</span>`;
+
+            let systemPrompt = "";
+            let userPrompt = "Generate a practice problem.";
+
+            if (topic === 'foundations') {
+                systemPrompt = "Generate a simple conceptual question about calculus derivatives, tangents, or instantaneous rate of change. Return strictly a valid JSON object matching this schema: { \"problem\": \"...\", \"answer\": \"...\" } where the answer is one or two words. IMPORTANT: Use double backslashes for LaTeX in the JSON.";
+            } else if (topic === 'basic') {
+                systemPrompt = "Generate a simple derivative practice problem using ONLY the Power Rule, Constant Rule, or basic Exponential Rule (e.g., f(x) = 5x^3). Return strictly a valid JSON object matching this schema: { \"problem\": \"...\", \"answer\": \"...\" }. IMPORTANT: Use double backslashes for LaTeX in the JSON.";
+            } else if (topic === 'complex') {
+                systemPrompt = "Generate a derivative practice problem using the Product, Quotient, or Chain rule (e.g., f(x) = (2x+1)^3). Return strictly a valid JSON object matching this schema: { \"problem\": \"...\", \"answer\": \"...\" }. IMPORTANT: Use double backslashes for LaTeX in the JSON.";
+            } else if (topic === 'application') {
+                systemPrompt = "Generate a simple calculus word problem involving a rate of change or derivative. The scenario MUST be heavily themed around the student's selected industry: " + document.getElementById('major-selector').value + ". Give variables that match the field (e.g. C(x) for cost, P(t) for population). Return strictly a valid JSON object matching this schema: { \"problem\": \"...\", \"answer\": \"...\" }. The answer should be a simple formula or number. IMPORTANT: Use double backslashes for LaTeX in the JSON.";
+            }
+
+            const raw = await callGemini(userPrompt, systemPrompt);
+            
+            try {
+                const clean = raw.replace(/```json|```/g, "").trim();
+                const data = JSON.parse(clean);
+                
+                const containerRoot = btn.closest('.practice-area');
+                const text = containerRoot.querySelector('.ai-problem-text');
+                const input = containerRoot.querySelector('.ai-input');
+                const feedback = containerRoot.querySelector('.ai-feedback');
+                
+                if (topic === 'application' || topic === 'foundations') {
+                    text.innerHTML = data.problem;
+                } else {
+                    text.innerHTML = `Find the derivative of: $${data.problem.replace('f(x) = ', '')}$`;
+                }
+                
+                input.dataset.answer = data.answer.replace(/\s+/g, ''); 
+                input.dataset.problem = data.problem; 
+                input.textContent = "";
+                input.classList.remove('correct', 'incorrect');
+                
+                feedback.style.display = 'none';
+                
+                const inlineChat = containerRoot.querySelector('.inline-problem-chat');
+                if (inlineChat) {
+                    inlineChat.classList.add('hidden');
+                    inlineChat.querySelector('.chat-history').innerHTML = '';
+                }
+
+                containerRoot.querySelector('.ai-problem-container').classList.remove('hidden');
+                initMath(text);
+            } catch (e) { 
+                console.error("AI JSON parsing error:", e);
+                alert("The AI generated a complex format. Please try generating again!");
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = original;
+        }
+
+        function appendInlineProblemMessage(historyElem, text, sender) {
+            const div = document.createElement('div');
+            if (sender === 'user') {
+                div.className = "bg-[var(--accent-primary)] text-white p-3 md:p-4 rounded-[20px] rounded-br-none ml-auto max-w-[85%] text-right font-bold shadow-sm";
+                div.textContent = text;
+            } else {
+                div.className = "bg-white/10 text-gray-200 p-3 md:p-4 rounded-[20px] rounded-bl-none mr-auto max-w-[90%] font-bold shadow-sm backdrop-blur-sm border border-white/10";
+                div.innerHTML = formatGeminiResponse(text);
+                initMath(div);
+            }
+            historyElem.appendChild(div);
+            historyElem.scrollTop = historyElem.scrollHeight;
+        }
+
+        async function triggerInlineProblemAI(historyElem, userMsg, problemContext) {
+            const uDivLoading = document.createElement('div');
+            uDivLoading.className = "bg-white/5 text-gray-400 p-3 md:p-4 rounded-[20px] rounded-bl-none mr-auto max-w-[85%] font-bold flex items-center border border-white/10";
+            uDivLoading.innerHTML = `<span class="loading-spinner border-gray-400 border-b-transparent w-4 h-4 mr-3"></span> Thinking...`;
+            historyElem.appendChild(uDivLoading);
+            historyElem.scrollTop = historyElem.scrollHeight;
+
+            let system = "You are an expert Math and Calculus tutor helping a student inline with a specific practice problem. Be Socratic, supportive, and brief. DO NOT give them the final answer. Use LaTeX for math. The problem context is: '" + problemContext + "'." + getMajorContext();
+            
+            const resp = await callGemini(userMsg, system);
+            
+            historyElem.removeChild(uDivLoading);
+            appendInlineProblemMessage(historyElem, resp, 'ai');
+        }
+
+        function discussProblemInline(btn) {
+            const containerRoot = btn.closest('.ai-problem-container');
+            const input = containerRoot.querySelector('.ai-input');
+            const problem = input.dataset.problem;
+            const userVal = input.textContent.trim();
+            
+            if (!problem) return;
+
+            const chatContainer = containerRoot.querySelector('.inline-problem-chat');
+            const history = chatContainer.querySelector('.chat-history');
+            
+            chatContainer.classList.remove('hidden');
+            chatContainer.classList.add('flex'); 
+            
+            if (history.children.length === 0) {
+                const msg = `I'm working on this calculus practice problem: "${problem}". ${userVal ? 'I thought the answer was "' + userVal + '", but I need help.' : 'Can you help me think through how to start?'}`;
+                appendInlineProblemMessage(history, msg, 'user');
+                triggerInlineProblemAI(history, msg, problem);
+            }
+
+            chatContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            chatContainer.querySelector('.chat-input').focus();
+        }
+
+        function sendInlineProblemChat(triggerElem) {
+            const chatContainer = triggerElem.closest('.inline-problem-chat');
+            const input = chatContainer.querySelector('.chat-input');
+            const history = chatContainer.querySelector('.chat-history');
+            const problemInput = chatContainer.closest('.ai-problem-container').querySelector('.ai-input');
+            
+            const val = input.value.trim();
+            if(!val) return;
+            
+            input.value = "";
+            appendInlineProblemMessage(history, val, 'user');
+            triggerInlineProblemAI(history, val, problemInput.dataset.problem);
+        }
+
+        async function sendDirectMessage(msg, isSocraticContext = false) {
+            const history = document.getElementById('chat-history');
+            
+            const uDiv = document.createElement('div');
+            uDiv.className = "bg-[var(--accent-primary)] font-bold text-white p-3 md:p-4 rounded-[20px] rounded-br-none ml-8 text-right shadow-sm";
+            uDiv.textContent = msg;
+            history.appendChild(uDiv);
+            history.scrollTop = history.scrollHeight;
+
+            const uDivLoading = document.createElement('div');
+            uDivLoading.className = "bg-[#f5f5f7] border border-gray-200 p-3 md:p-4 rounded-[20px] rounded-bl-none mr-8 shadow-sm flex items-center text-slate-600 font-bold";
+            uDivLoading.innerHTML = `<span class="loading-spinner border-gray-400 border-b-transparent w-4 h-4 mr-3"></span> Thinking...`;
+            history.appendChild(uDivLoading);
+            history.scrollTop = history.scrollHeight;
+
+            let system = "You are an expert Math and Calculus tutor. Your goal is to help students THINK through problems using the Socratic method. Be encouraging, supportive, and brief. DO NOT immediately give final answers to problems. Use LaTeX for math." + getMajorContext();
+            
+            if (isSocraticContext) {
+                system += " The student has invoked you specifically from a practice problem or a concept explanation they are struggling with. Heavily prioritize asking guiding, step-by-step questions to help them uncover the answer or understand the concept themselves.";
+            }
+
+            const resp = await callGemini(msg, system);
+
+            history.removeChild(uDivLoading);
+            const aDiv = document.createElement('div');
+            aDiv.className = "bg-[#f5f5f7] border border-gray-200 p-3 md:p-4 rounded-[20px] rounded-bl-none mr-8 shadow-sm text-slate-800 font-bold leading-relaxed";
+            
+            aDiv.innerHTML = formatGeminiResponse(resp);
+            history.appendChild(aDiv);
+            initMath(aDiv);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function triggerSocraticHelpInline(btn) {
+            const wrapper = btn.closest('.input-wrapper');
+            const input = wrapper.querySelector('.input-box');
+            const userVal = input.textContent.trim();
+            const concept = input.dataset.concept || "this concept";
+            
+            toggleChat(true);
+            const msg = `I'm stuck on the concept: "${concept}". I typed "${userVal || "[blank]"}". Can you guide me on how to find the right answer?`;
+            sendDirectMessage(msg, true);
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const val = input.value.trim();
+            if(!val) return;
+            input.value = "";
+            sendDirectMessage(val, false);
+        }
+
+        function formatUserString(str) {
+            return str.toLowerCase().replace(/\s/g, '').replace(/−/g, '-');
+        }
+
+        function setupInputListeners() {
+            const appRoot = document.getElementById('interactive-worksheet-app');
+            if(!appRoot) return;
+
+            appRoot.querySelectorAll('.input-box:not(.ai-input)').forEach(box => {
+                box.addEventListener('keydown', e => { 
+                    if(e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        box.blur(); 
+                    } 
+                });
+
+                box.addEventListener('blur', () => {
+                    const userVal = formatUserString(box.textContent);
+                    const ansVal = formatUserString(box.dataset.answer);
+                    const wrapper = box.closest('.input-wrapper');
+                    const helpBtn = wrapper.querySelector('.inline-help-btn');
+                    
+                    if (userVal === "") {
+                        box.classList.remove('correct', 'incorrect');
+                        if(helpBtn) helpBtn.style.display = 'none';
+                        updateProgress();
+                        return;
+                    }
+
+                    const isCorrect = userVal === ansVal || userVal.includes(ansVal) || ansVal.includes(userVal);
+                    box.classList.toggle('correct', isCorrect);
+                    box.classList.toggle('incorrect', !isCorrect);
+                    
+                    if (!isCorrect && helpBtn) {
+                        helpBtn.style.display = 'block';
+                    } else if (helpBtn) {
+                        helpBtn.style.display = 'none';
+                    }
+                    updateProgress();
+                });
+            });
+        }
+
+        function updateProgress() {
+            const appRoot = document.getElementById('interactive-worksheet-app');
+            const boxes = appRoot.querySelectorAll('.input-box:not(.ai-input)');
+            const correct = Array.from(boxes).filter(b => b.classList.contains('correct')).length;
+            const pct = Math.round((correct / boxes.length) * 100);
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = pct + '%';
+        }
+
+        function checkAiAnswer(btn) {
+            if(!btn) return;
+            const containerRoot = btn.closest('.ai-problem-container');
+            if(!containerRoot) return;
+            
+            const input = containerRoot.querySelector('.ai-input');
+            const feedback = containerRoot.querySelector('.ai-feedback');
+            
+            if(!input || !feedback) return;
+            
+            const userVal = formatUserString(input.textContent);
+            const ansVal = formatUserString(input.dataset.answer);
+            
+            if (userVal === "") return;
+
+            const isCorrect = userVal === ansVal || userVal.includes(ansVal) || ansVal.includes(userVal);
+            
+            input.classList.toggle('correct', isCorrect);
+            input.classList.toggle('incorrect', !isCorrect);
+            
+            feedback.style.display = 'block';
+            if (isCorrect) {
+                feedback.innerHTML = `<span class="text-[#248a3d] font-extrabold">✓ Correct!</span> Great job applying the rules.`;
+                feedback.className = "ai-feedback mt-6 text-sm md:text-base bg-[#f0fdf4] text-[#248a3d] p-4 rounded-2xl border border-[#16a34a] font-semibold";
+            } else {
+                feedback.innerHTML = `Not quite! Try clicking <strong>Tutor</strong> to get some guidance.`;
+                feedback.className = "ai-feedback mt-6 text-sm md:text-base bg-[#fff5f5] text-[#c92a20] p-4 rounded-2xl border border-[#dc2626] font-semibold";
+            }
+        }
+
+        function toggleChat(forceOpen = false) { 
+            const chatWindow = document.getElementById('ai-chat-window');
+            if (forceOpen === true) chatWindow.classList.remove('hidden');
+            else chatWindow.classList.toggle('hidden'); 
+        }
+        
+        function closeModal() { 
+            document.getElementById('ai-modal').classList.add('hidden'); 
+            document.getElementById('inline-chat-section').classList.add('hidden');
+            document.getElementById('inline-chat-section').classList.remove('flex');
+            document.getElementById('inline-chat-history').innerHTML = '';
+        }
+
+        // --- Interactive Graph ---
+        function drawTangentGraph() {
+            const canvas = document.getElementById('tangentCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const slider = document.getElementById('aSlider');
+            const slopeDisplay = document.getElementById('slopeDisplay');
+
+            function f(x) { return Math.pow(x, 3) - 2 * x; }
+            function df(x) { return 3 * Math.pow(x, 2) - 2; }
+
+            function render() {
+                const a = parseFloat(slider.value);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const scaleX = 80; const scaleY = 30;
+                const centerX = canvas.width / 2; const centerY = canvas.height / 2;
+                const toX = (val) => centerX + val * scaleX;
+                const toY = (val) => centerY - val * scaleY;
+
+                ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0, centerY); ctx.lineTo(canvas.width, centerY); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(centerX, 0); ctx.lineTo(centerX, canvas.height); ctx.stroke();
+
+                ctx.strokeStyle = '#52525b'; ctx.lineWidth = 3;
+                ctx.lineCap = "round"; ctx.lineJoin = "round";
+                ctx.beginPath();
+                for (let x = -3; x <= 3; x += 0.05) {
+                    if (x === -3) ctx.moveTo(toX(x), toY(f(x))); else ctx.lineTo(toX(x), toY(f(x)));
+                }
+                ctx.stroke();
+
+                const fa = f(a); const slope = df(a);
+                ctx.strokeStyle = '#8C1D40'; ctx.lineWidth = 2.5; 
+                const len = 2;
+                ctx.beginPath();
+                ctx.moveTo(toX(a - len), toY(fa - slope * len));
+                ctx.lineTo(toX(a + len), toY(fa + slope * len));
+                ctx.stroke();
+
+                ctx.fillStyle = '#FFC627';
+                ctx.beginPath(); ctx.arc(toX(a), toY(fa), 6, 0, Math.PI * 2); ctx.fill(); 
+                ctx.strokeStyle = '#8C1D40'; ctx.lineWidth = 2; ctx.stroke();
+
+                slopeDisplay.innerHTML = `At $x = ${a.toFixed(1)}$, the slope $f'(${a.toFixed(1)}) = ${slope.toFixed(2)}$`;
+                if (typeof renderMathInElement === 'function') renderMathInElement(slopeDisplay, {delimiters: [{left: '$', right: '$', display: false}]});
+            }
+            slider.addEventListener('input', render);
+            render();
+        }
+    </script>
+</div>
